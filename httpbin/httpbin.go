@@ -113,6 +113,7 @@ func (h *HTTPBin) Handler() http.Handler {
 	mux.HandleFunc("/delete", methods(h.RequestWithBody, "DELETE"))
 
 	mux.HandleFunc("/anything/", h.RequestWithBody)
+	mux.HandleFunc("/fail-request/", h.Retry)
 
 	mux.HandleFunc("/ip", h.IP)
 	mux.HandleFunc("/user-agent", h.UserAgent)
