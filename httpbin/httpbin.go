@@ -1,6 +1,7 @@
 package httpbin
 
 import (
+	"golang.org/x/net/websocket"
 	"net/http"
 	"net/url"
 	"time"
@@ -114,6 +115,7 @@ func (h *HTTPBin) Handler() http.Handler {
 
 	mux.HandleFunc("/anything/", h.RequestWithBody)
 	mux.HandleFunc("/fail-request/", h.Retry)
+	mux.Handle("/websocket-echo", websocket.Handler(h.EchoWebsocket))
 
 	mux.HandleFunc("/ip", h.IP)
 	mux.HandleFunc("/user-agent", h.UserAgent)

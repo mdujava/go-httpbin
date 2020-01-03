@@ -6,6 +6,8 @@ import (
 	"compress/zlib"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/net/websocket"
+	"io"
 	"math/rand"
 	"net/http"
 	"strconv"
@@ -989,4 +991,8 @@ func (h *HTTPBin) Retry(w http.ResponseWriter, r *http.Request) {
 	mutex.Unlock()
 
 	w.WriteHeader(responseCode)
+}
+
+func (h *HTTPBin) EchoWebsocket(ws *websocket.Conn) {
+	io.Copy(ws, ws)
 }
