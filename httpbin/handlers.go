@@ -58,6 +58,7 @@ func (h *HTTPBin) Get(w http.ResponseWriter, r *http.Request) {
 		Headers: getRequestHeaders(r),
 		Origin:  getOrigin(r),
 		URL:     getURL(r).String(),
+		Path:    r.URL.Path,
 	}
 	body, _ := json.Marshal(resp)
 	writeJSON(w, body, http.StatusOK)
@@ -657,6 +658,7 @@ func (h *HTTPBin) ETag(w http.ResponseWriter, r *http.Request) {
 		Headers: getRequestHeaders(r),
 		Origin:  getOrigin(r),
 		URL:     getURL(r).String(),
+		Path:    r.URL.Path,
 	}
 	body, _ := json.Marshal(resp)
 

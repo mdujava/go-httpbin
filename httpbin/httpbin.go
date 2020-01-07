@@ -33,6 +33,7 @@ type getResponse struct {
 	Headers http.Header `json:"headers"`
 	Origin  string      `json:"origin"`
 	URL     string      `json:"url"`
+	Path    string   	`json:"path"`
 }
 
 // A generic response for any incoming request that might contain a body
