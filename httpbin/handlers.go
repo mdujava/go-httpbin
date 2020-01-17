@@ -998,3 +998,24 @@ func (h *HTTPBin) Retry(w http.ResponseWriter, r *http.Request) {
 func (h *HTTPBin) EchoWebsocket(ws *websocket.Conn) {
 	io.Copy(ws, ws)
 }
+
+
+// Return info about request
+func (h *HTTPBin) Info(w http.ResponseWriter, r *http.Request) {
+	resp := &infoResponse{
+		Method:           r.Method,
+		URL:              getURL(r).String(),
+		Proto:            r.Proto,
+		ProtoMajor:       r.ProtoMajor,
+		ProtoMinor:       r.ProtoMinor,
+		Headers:          getRequestHeaders(r),
+		TransferEncoding: r.TransferEncoding,
+		Host:             r.Host,
+		Args:             r.URL.Query(),
+		RemoteAddr:       r.RemoteAddr,
+		RequestURI:       r.RequestURI,
+		TLS:              r.TLS,
+	}
+	body, _ := json.Marshal(resp)
+	writeJSON(w, body, http.StatusOK)
+}

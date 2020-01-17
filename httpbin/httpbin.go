@@ -1,6 +1,7 @@
 package httpbin
 
 import (
+	"crypto/tls"
 	"golang.org/x/net/websocket"
 	"net/http"
 	"net/url"
@@ -87,6 +88,21 @@ type bearerResponse struct {
 	Token         string `json:"token"`
 }
 
+type infoResponse struct {
+	Method string  			  `json:"method"`
+	URL string 				  `json:"URL"`
+	Proto string 			  `json:"proto"`
+	ProtoMajor int 			  `json:"proto-major"`
+	ProtoMinor int 			  `json:"proto-minor"`
+	Headers http.Header 	  `json:"headers"`
+	TransferEncoding []string `json:"transfer-encoding"`
+	Host string 			  `json:"host"`
+	Args url.Values 		  `json:"args"`
+	RemoteAddr string 		  `json:"remote-address"`
+	RequestURI string 		  `json:"request-uri"`
+	TLS *tls.ConnectionState  `json:"tls"`
+}
+
 // HTTPBin contains the business logic
 type HTTPBin struct {
 	// Max size of an incoming request generated response body, in bytes
@@ -116,6 +132,8 @@ func (h *HTTPBin) Handler() http.Handler {
 
 	mux.HandleFunc("/anything/", h.RequestWithBody)
 	mux.HandleFunc("/fail-request/", h.Retry)
+	mux.HandleFunc("/info", h.Info)
+
 	mux.Handle("/websocket-echo", websocket.Handler(h.EchoWebsocket))
 
 	mux.HandleFunc("/ip", h.IP)
