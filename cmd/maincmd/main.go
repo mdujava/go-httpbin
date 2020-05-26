@@ -2,8 +2,11 @@ package maincmd
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -26,7 +29,29 @@ var (
 	maxDuration   time.Duration
 	httpsCertFile string
 	httpsKeyFile  string
+	mTLSEnabled   bool
 )
+
+func getMTLSConfig(clientCertFile string) *tls.Config {
+	clientCert, err := ioutil.ReadFile(clientCertFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to read certificate file: %s\n", clientCertFile)
+		os.Exit(1)
+	}
+
+	clientCertPool := x509.NewCertPool()
+	clientCertPool.AppendCertsFromPEM(clientCert)
+
+	tlsConfig := &tls.Config{
+		ClientCAs:                clientCertPool,
+		ClientAuth:               tls.RequireAndVerifyClientCert,
+		PreferServerCipherSuites: true,
+	}
+
+	tlsConfig.BuildNameToCertificate()
+
+	return tlsConfig
+}
 
 // Main implements the go-httpbin CLI's main() function in a reusable way
 func Main() {
@@ -36,6 +61,7 @@ func Main() {
 	flag.StringVar(&httpsKeyFile, "https-key-file", "", "HTTPS Server private key file")
 	flag.Int64Var(&maxBodySize, "max-body-size", httpbin.DefaultMaxBodySize, "Maximum size of request or response, in bytes")
 	flag.DurationVar(&maxDuration, "max-duration", httpbin.DefaultMaxDuration, "Maximum duration a response may take")
+	flag.BoolVar(&mTLSEnabled, "mTLS", false, "Enable Mutual TLS Authentication")
 	flag.Parse()
 
 	// Command line flags take precedence over environment vars, so we only
@@ -77,6 +103,15 @@ func Main() {
 		httpsKeyFile = os.Getenv("HTTPS_KEY_FILE")
 	}
 
+	if !mTLSEnabled && os.Getenv("MTLS_ENABLED") != "" {
+		mTLSEnabled, err = strconv.ParseBool(os.Getenv("MTLS_ENABLED"))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: invalid value %#v for env var MTLS_ENABLED: %s\n\n", os.Getenv("MTLS_ENABLED"), err)
+			flag.Usage()
+			os.Exit(1)
+		}
+	}
+
 	var serveTLS bool
 	if httpsCertFile != "" || httpsKeyFile != "" {
 		serveTLS = true
@@ -111,6 +146,10 @@ func Main() {
 	server := &http.Server{
 		Addr:    listenAddr,
 		Handler: h.Handler(),
+	}
+
+	if mTLSEnabled {
+		server.TLSConfig = getMTLSConfig(httpsCertFile)
 	}
 
 	// shutdownCh triggers graceful shutdown on SIGINT or SIGTERM
