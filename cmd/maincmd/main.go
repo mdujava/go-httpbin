@@ -29,23 +29,30 @@ var (
 	maxDuration   time.Duration
 	httpsCertFile string
 	httpsKeyFile  string
+	caCertFile    string
 	mTLSEnabled   bool
 )
 
-func getMTLSConfig(clientCertFile string) *tls.Config {
-	clientCert, err := ioutil.ReadFile(clientCertFile)
+func getMTLSConfig(ca, cert, key string) *tls.Config {
+	caCertPem, err := ioutil.ReadFile(ca)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to read certificate file: %s\n", clientCertFile)
+		fmt.Fprintf(os.Stderr, "Error: failed to read root certificate: %s\n", ca)
 		os.Exit(1)
 	}
 
-	clientCertPool := x509.NewCertPool()
-	clientCertPool.AppendCertsFromPEM(clientCert)
+	clientCAs := x509.NewCertPool()
+	clientCAs.AppendCertsFromPEM(caCertPem)
+
+	x509Cert, parseErr := tls.LoadX509KeyPair(cert, key)
+	if parseErr != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to parse cert %s and key %s\n", cert, key)
+		os.Exit(1)
+	}
 
 	tlsConfig := &tls.Config{
-		ClientCAs:                clientCertPool,
-		ClientAuth:               tls.RequireAndVerifyClientCert,
-		PreferServerCipherSuites: true,
+		Certificates: []tls.Certificate{x509Cert},
+		ClientCAs:    clientCAs,
+		ClientAuth:   tls.RequireAndVerifyClientCert,
 	}
 
 	tlsConfig.BuildNameToCertificate()
@@ -57,6 +64,7 @@ func getMTLSConfig(clientCertFile string) *tls.Config {
 func Main() {
 	flag.StringVar(&host, "host", defaultHost, "Host to listen on")
 	flag.IntVar(&port, "port", defaultPort, "Port to listen on")
+	flag.StringVar(&caCertFile, "ca-cert-file", "", "Certificate Authority file")
 	flag.StringVar(&httpsCertFile, "https-cert-file", "", "HTTPS Server certificate file")
 	flag.StringVar(&httpsKeyFile, "https-key-file", "", "HTTPS Server private key file")
 	flag.Int64Var(&maxBodySize, "max-body-size", httpbin.DefaultMaxBodySize, "Maximum size of request or response, in bytes")
@@ -96,6 +104,9 @@ func Main() {
 		}
 	}
 
+	if caCertFile == "" && os.Getenv("CA_CERT_FILE") != "" {
+		caCertFile = os.Getenv("CA_CERT_FILE")
+	}
 	if httpsCertFile == "" && os.Getenv("HTTPS_CERT_FILE") != "" {
 		httpsCertFile = os.Getenv("HTTPS_CERT_FILE")
 	}
@@ -120,6 +131,12 @@ func Main() {
 			flag.Usage()
 			os.Exit(1)
 		}
+	}
+
+	if mTLSEnabled && caCertFile == "" {
+		fmt.Fprintf(os.Stderr, "Error: CA certificate must be provided.\n\n")
+		flag.Usage()
+		os.Exit(1)
 	}
 
 	logger := log.New(os.Stderr, "", 0)
@@ -148,10 +165,6 @@ func Main() {
 		Handler: h.Handler(),
 	}
 
-	if mTLSEnabled {
-		server.TLSConfig = getMTLSConfig(httpsCertFile)
-	}
-
 	// shutdownCh triggers graceful shutdown on SIGINT or SIGTERM
 	shutdownCh := make(chan os.Signal, 1)
 	signal.Notify(shutdownCh, syscall.SIGINT, syscall.SIGTERM)
@@ -178,7 +191,13 @@ func Main() {
 	var listenErr error
 	if serveTLS {
 		serverLog("go-httpbin listening on https://%s", listenAddr)
-		listenErr = server.ListenAndServeTLS(httpsCertFile, httpsKeyFile)
+		if mTLSEnabled {
+			server.TLSConfig = getMTLSConfig(caCertFile, httpsCertFile, httpsKeyFile)
+			// Force ListenAndServeTLS to use cert and key from TLSConfig
+			listenErr = server.ListenAndServeTLS("", "")
+		} else {
+			listenErr = server.ListenAndServeTLS(httpsCertFile, httpsKeyFile)
+		}
 	} else {
 		serverLog("go-httpbin listening on http://%s", listenAddr)
 		listenErr = server.ListenAndServe()
