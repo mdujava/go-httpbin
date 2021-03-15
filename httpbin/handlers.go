@@ -71,6 +71,7 @@ func (h *HTTPBin) RequestWithBody(w http.ResponseWriter, r *http.Request) {
 		Headers: getRequestHeaders(r),
 		Origin:  getOrigin(r),
 		URL:     getURL(r).String(),
+		Path:    r.URL.Path,
 	}
 
 	err := parseBody(w, r, resp)

@@ -43,6 +43,7 @@ type bodyResponse struct {
 	Headers http.Header `json:"headers"`
 	Origin  string      `json:"origin"`
 	URL     string      `json:"url"`
+	Path    string      `json:"path"`
 
 	Data  string              `json:"data"`
 	Files map[string][]string `json:"files"`
