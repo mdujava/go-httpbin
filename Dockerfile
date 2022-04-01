@@ -1,9 +1,7 @@
-FROM golang:1.13
+# syntax = docker/dockerfile:1.3
+FROM golang:1.18
 
 WORKDIR /go/src/github.com/mccutchen/go-httpbin
-
-COPY Makefile .
-RUN make deps
 
 COPY . .
 RUN make

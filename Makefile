@@ -16,37 +16,29 @@ COVERAGE_PATH ?= coverage.txt
 COVERAGE_ARGS ?= -covermode=atomic -coverprofile=$(COVERAGE_PATH)
 TEST_ARGS     ?= -race
 
-GENERATED_ASSETS_PATH := httpbin/assets/assets.go
-
-BIN_DIR   := $(GOPATH)/bin
-GOLINT    := $(BIN_DIR)/golint
-GOBINDATA := $(BIN_DIR)/go-bindata
+# Tool dependencies
+TOOL_BIN_DIR     ?= $(shell go env GOPATH)/bin
+TOOL_GOLINT      := $(TOOL_BIN_DIR)/golint
+TOOL_STATICCHECK := $(TOOL_BIN_DIR)/staticcheck
 
 GO_SOURCES = $(wildcard **/*.go)
+
+GENERATED_ASSETS_PATH := httpbin/assets/assets.go
 
 # =============================================================================
 # build
 # =============================================================================
 build: $(DIST_PATH)/go-httpbin
 
-$(DIST_PATH)/go-httpbin: assets $(GO_SOURCES)
+$(DIST_PATH)/go-httpbin: $(GO_SOURCES)
 	mkdir -p $(DIST_PATH)
 	go build -o $(DIST_PATH)/go-httpbin ./cmd/go-httpbin
 
-assets: $(GENERATED_ASSETS_PATH)
+buildtests:
+	CGO_ENABLED=0 go test -ldflags="-s -w" -v -c -o $(DIST_PATH)/go-httpbin.test ./httpbin
 
 clean:
 	rm -rf $(DIST_PATH) $(COVERAGE_PATH)
-
-$(GENERATED_ASSETS_PATH): $(GOBINDATA) static/*
-	$(GOBINDATA) -o $(GENERATED_ASSETS_PATH) -pkg=assets -prefix=static static
-	# reformat generated code
-	gofmt -s -w $(GENERATED_ASSETS_PATH)
-	# dumb hack to make generate code lint correctly
-	sed -i.bak 's/Html/HTML/g' $(GENERATED_ASSETS_PATH)
-	sed -i.bak 's/Xml/XML/g' $(GENERATED_ASSETS_PATH)
-	rm $(GENERATED_ASSETS_PATH).bak
-
 
 # =============================================================================
 # test & lint
@@ -95,17 +87,8 @@ imagepush: image
 # =============================================================================
 # dependencies
 # =============================================================================
-deps: $(GOLINT) $(GOBINDATA)
-
-# Can't install from working dir because of go mod issues:
-#
-#     go get -u github.com/kevinburke/go-bindata/...
-#     go: finding github.com/kevinburke/go-bindata/... latest
-#     go get github.com/kevinburke/go-bindata/...: no matching versions for query "latest"
-#
-# So we get out of the go modules path to install.
-$(GOBINDATA):
-	cd /tmp && go get -u github.com/kevinburke/go-bindata/...
+$(TOOL_GOLINT):
+	go install golang.org/x/lint/golint@latest
 
 $(GOLINT):
 	go get -u golang.org/x/lint/golint
